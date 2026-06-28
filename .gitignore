@@ -1,0 +1,11 @@
+.env
+
+wordpress/
+
+logs/
+
+backups/
+
+nginx/ssl/
+
+*.log
