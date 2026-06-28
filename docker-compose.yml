@@ -17,6 +17,12 @@ services:
       - ./nginx/cache:/var/cache/nginx
     networks:
       - cloudaziz
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   mariadb:
     image: mariadb:11.8
@@ -31,6 +37,13 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       TZ: ${TZ}
+    
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
     command:
       - --character-set-server=utf8mb4
@@ -52,6 +65,12 @@ services:
       - 256mb
       - --maxmemory-policy
       - allkeys-lru
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     volumes:
       - redis_data:/data
     networks:
