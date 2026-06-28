@@ -14,6 +14,7 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
+      - ./nginx/cache:/var/cache/nginx
     networks:
       - cloudaziz
 
