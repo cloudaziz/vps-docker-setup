@@ -24,6 +24,7 @@ services:
 
     env_file:
       - .env
+
     environment:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
@@ -34,8 +35,10 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+
     volumes:
       - mariadb_data:/var/lib/mysql
+
     networks:
       - cloudaziz
 
@@ -43,9 +46,12 @@ services:
     image: redis:8-alpine
     container_name: redis
     restart: unless-stopped
+
     command: redis-server --appendonly yes
+
     volumes:
       - redis_data:/data
+
     networks:
       - cloudaziz
 
@@ -53,57 +59,32 @@ services:
     build:
       context: .
       dockerfile: docker/wordpress/Dockerfile
+
     image: cloudaziz-wordpress
+
     container_name: wordpress
+
     restart: unless-stopped
+
     depends_on:
       - mariadb
       - redis
+
     env_file:
       - .env
+
     environment:
       WORDPRESS_DB_HOST: mariadb:3306
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
       WORDPRESS_DB_USER: ${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+
     volumes:
       - wordpress_data:/var/www/html
       - ./docker/wordpress/php.ini:/usr/local/etc/php/conf.d/php.ini:ro
       - ./docker/wordpress/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
       - ./docker/wordpress/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini:ro
-    healthcheck:
-      test: ["CMD", "php", "-v"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    networks:
-      - cloudaziz
-  wordpress-2:
-    image: cloudaziz-wordpress
-    container_name: wordpress-2
-    restart: unless-stopped
-    depends_on:
-      - mariadb
-      - redis
-    env_file:
-      - .env
-    environment:
-      WORDPRESS_DB_HOST: mariadb:3306
-      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
-      WORDPRESS_DB_USER: ${MYSQL_USER}
-      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - wordpress_data:/var/www/html
-      - ./docker/wordpress/php.ini:/usr/local/etc/php/conf.d/php.ini:ro
-      - ./docker/wordpress/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
-      - ./docker/wordpress/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini:ro
-    healthcheck:
-      test: ["CMD", "php", "-v"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+
     networks:
       - cloudaziz
 
