@@ -3,7 +3,6 @@ services:
   mariadb:
     image: mariadb:11.8
     container_name: mariadb
-
     restart: unless-stopped
 
     env_file:
@@ -29,13 +28,45 @@ services:
   redis:
     image: redis:8-alpine
     container_name: redis
-
     restart: unless-stopped
 
     command: redis-server --appendonly yes
 
     volumes:
       - redis_data:/data
+
+    networks:
+      - cloudaziz
+
+  wordpress:
+    build:
+      context: .
+      dockerfile: docker/wordpress/Dockerfile
+
+    image: cloudaziz-wordpress
+
+    container_name: wordpress
+
+    restart: unless-stopped
+
+    depends_on:
+      - mariadb
+      - redis
+
+    env_file:
+      - .env
+
+    environment:
+      WORDPRESS_DB_HOST: mariadb:3306
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./docker/wordpress/php.ini:/usr/local/etc/php/conf.d/php.ini:ro
+      - ./docker/wordpress/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
+      - ./docker/wordpress/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini:ro
 
     networks:
       - cloudaziz
@@ -47,3 +78,4 @@ networks:
 volumes:
   mariadb_data:
   redis_data:
+  wordpress_data:
