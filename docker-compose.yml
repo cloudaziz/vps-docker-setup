@@ -1,0 +1,49 @@
+services:
+
+  mariadb:
+    image: mariadb:11.8
+    container_name: mariadb
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: ${TZ}
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+    networks:
+      - cloudaziz
+
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+
+    restart: unless-stopped
+
+    command: redis-server --appendonly yes
+
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - cloudaziz
+
+networks:
+  cloudaziz:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+  redis_data:
