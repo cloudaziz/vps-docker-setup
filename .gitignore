@@ -1,11 +1,18 @@
+# Environment
 .env
 
 wordpress/
 
 logs/
 
+# Backups
 backups/
 
+# SSL
+certbot/conf/
+certbot/www/
 nginx/ssl/
 
+# Logs
+logs/
 *.log
