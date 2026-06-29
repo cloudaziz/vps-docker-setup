@@ -16,3 +16,6 @@ nginx/ssl/
 # Logs
 logs/
 *.log
+
+# Nginx runtime cache
+nginx/cache/

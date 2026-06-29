@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -Eeuo pipefail
 
 PROJECT_DIR="/srv/cloudaziz"
+BACKUP_DIR="$PROJECT_DIR/backups/database"
 
 set -a
 source "$PROJECT_DIR/.env"
@@ -10,37 +11,63 @@ set +a
 
 if [ $# -ne 1 ]; then
     echo "Usage:"
-    echo "./restore-db.sh backup.sql.gz"
+    echo "  ./scripts/restore/restore-db.sh <backup.sql.gz>"
     exit 1
 fi
 
 BACKUP_FILE="$1"
 
 if [ ! -f "$BACKUP_FILE" ]; then
-    echo "Backup file not found."
+    echo "ERROR: Backup file not found:"
+    echo "$BACKUP_FILE"
     exit 1
 fi
 
-echo
-echo "WARNING!"
-echo
-echo "This will overwrite the current database."
-echo
+TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+EMERGENCY_BACKUP="$BACKUP_DIR/${TIMESTAMP}-before-restore.sql.gz"
 
-read -p "Continue? (yes/no): " answer
+echo "========================================="
+echo " Emergency Database Backup"
+echo "========================================="
 
-if [ "$answer" != "yes" ]; then
-    echo "Cancelled."
+docker exec mariadb mariadb-dump \
+    -u"${MYSQL_USER}" \
+    -p"${MYSQL_PASSWORD}" \
+    "${MYSQL_DATABASE}" \
+| gzip > "$EMERGENCY_BACKUP"
+
+echo
+echo "Emergency backup saved:"
+echo "$EMERGENCY_BACKUP"
+
+echo
+echo "========================================="
+echo " Database Restore"
+echo "========================================="
+
+read -rp "Type YES to continue: " CONFIRM
+
+if [ "$CONFIRM" != "YES" ]; then
+    echo "Restore cancelled."
     exit 0
 fi
-
-echo
-echo "Restoring database..."
 
 gunzip -c "$BACKUP_FILE" | docker exec -i mariadb mariadb \
     -u"${MYSQL_USER}" \
     -p"${MYSQL_PASSWORD}" \
     "${MYSQL_DATABASE}"
+
+echo
+echo "Database restored successfully."
+
+echo
+echo "Running verification..."
+
+docker exec mariadb mariadb \
+    -u"${MYSQL_USER}" \
+    -p"${MYSQL_PASSWORD}" \
+    -e "USE ${MYSQL_DATABASE}; SHOW TABLES;" \
+| head
 
 echo
 echo "Restore completed successfully."
