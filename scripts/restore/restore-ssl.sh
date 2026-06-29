@@ -31,11 +31,21 @@ echo
 echo "Emergency backup:"
 echo "$EMERGENCY"
 
-read -rp "Type YES to continue: " CONFIRM
+AUTO_CONFIRM=false
 
-if [ "$CONFIRM" != "YES" ]; then
-    echo "Restore cancelled."
-    exit 0
+if [[ "${2:-}" == "--yes" ]] || [[ "${1:-}" == "--yes" ]]; then
+    AUTO_CONFIRM=true
+fi
+
+if [ "$AUTO_CONFIRM" = false ]; then
+    read -rp "Type YES to continue: " CONFIRM
+
+    if [ "$CONFIRM" != "YES" ]; then
+        echo "Restore cancelled."
+        exit 0
+    fi
+else
+    echo "Auto confirmation enabled."
 fi
 
 rm -rf "$SSL_DIR"

@@ -34,11 +34,22 @@ echo "Emergency backup:"
 echo "$EMERGENCY_BACKUP"
 
 echo
-read -rp "Type YES to continue: " CONFIRM
 
-if [ "$CONFIRM" != "YES" ]; then
-    echo "Restore cancelled."
-    exit 0
+AUTO_CONFIRM=false
+
+if [[ "${2:-}" == "--yes" ]] || [[ "${1:-}" == "--yes" ]]; then
+    AUTO_CONFIRM=true
+fi
+
+if [ "$AUTO_CONFIRM" = false ]; then
+    read -rp "Type YES to continue: " CONFIRM
+
+    if [ "$CONFIRM" != "YES" ]; then
+        echo "Restore cancelled."
+        exit 0
+    fi
+else
+    echo "Auto confirmation enabled."
 fi
 
 echo

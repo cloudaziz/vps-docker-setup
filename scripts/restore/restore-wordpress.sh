@@ -64,14 +64,21 @@ echo " WordPress Restore"
 
 echo "========================================="
 
-read -rp "Type YES to continue: " CONFIRM
+AUTO_CONFIRM=false
 
-if [ "$CONFIRM" != "YES" ]; then
+if [[ "${2:-}" == "--yes" ]] || [[ "${1:-}" == "--yes" ]]; then
+    AUTO_CONFIRM=true
+fi
 
-echo "Restore cancelled."
+if [ "$AUTO_CONFIRM" = false ]; then
+    read -rp "Type YES to continue: " CONFIRM
 
-exit 0
-
+    if [ "$CONFIRM" != "YES" ]; then
+        echo "Restore cancelled."
+        exit 0
+    fi
+else
+    echo "Auto confirmation enabled."
 fi
 
 echo

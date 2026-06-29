@@ -45,11 +45,21 @@ echo "========================================="
 echo " Database Restore"
 echo "========================================="
 
-read -rp "Type YES to continue: " CONFIRM
+AUTO_CONFIRM=false
 
-if [ "$CONFIRM" != "YES" ]; then
-    echo "Restore cancelled."
-    exit 0
+if [[ "${2:-}" == "--yes" ]] || [[ "${1:-}" == "--yes" ]]; then
+    AUTO_CONFIRM=true
+fi
+
+if [ "$AUTO_CONFIRM" = false ]; then
+    read -rp "Type YES to continue: " CONFIRM
+
+    if [ "$CONFIRM" != "YES" ]; then
+        echo "Restore cancelled."
+        exit 0
+    fi
+else
+    echo "Auto confirmation enabled."
 fi
 
 gunzip -c "$BACKUP_FILE" | docker exec -i mariadb mariadb \
