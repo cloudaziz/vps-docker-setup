@@ -37,7 +37,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       TZ: ${TZ}
-    
+
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
@@ -93,6 +93,7 @@ services:
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
       WORDPRESS_DB_USER: ${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_INSTANCE: "WordPress #1"
     volumes:
       - wordpress_data:/var/www/html
       - ./docker/wordpress/php.ini:/usr/local/etc/php/conf.d/php.ini:ro
@@ -120,6 +121,7 @@ services:
       WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
       WORDPRESS_DB_USER: ${MYSQL_USER}
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_INSTANCE: "WordPress #2"
     volumes:
       - wordpress_data:/var/www/html
       - ./docker/wordpress/php.ini:/usr/local/etc/php/conf.d/php.ini:ro
