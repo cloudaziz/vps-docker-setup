@@ -136,6 +136,20 @@ services:
     networks:
       - cloudaziz
 
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: 3306
+      PMA_ABSOLUTE_URI: https://cloudaziz.com/phpmyadmin/
+      UPLOAD_LIMIT: 256M
+    depends_on:
+      - mariadb
+    networks:
+      - cloudaziz
+
 networks:
   cloudaziz:
     driver: bridge
