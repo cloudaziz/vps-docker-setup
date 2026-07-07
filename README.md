@@ -1,5 +1,71 @@
 # CloudAziz VPS Docker Setup
 
+## Overview
+
+CloudAziz VPS Docker Setup is a production-ready Docker-based WordPress stack optimized for a **2 GB VPS**.
+
+It provides a reproducible deployment with:
+
+- Nginx (Reverse Proxy)
+- WordPress PHP-FPM 8.3
+- MariaDB 11.8
+- Redis Object Cache
+- phpMyAdmin
+- Let's Encrypt SSL
+- FastCGI Cache
+- Load Balancing (2× WordPress Containers)
+- Backup & Restore Scripts
+- Health Monitoring
+
+The repository is designed so that a fresh clone can be deployed on a new VPS with minimal configuration.
+
+## Quick Start
+
+```bash
+git clone git@github.com:cloudaziz/vps-docker-setup.git
+
+cd vps-docker-setup
+
+cp .env.example .env
+
+nano .env
+
+docker compose build
+
+docker compose up -d
+```
+
+After the stack is running, obtain an SSL certificate using Certbot and reload Nginx.
+
+## Architecture
+
+                Internet
+                    │
+              HTTPS :443
+                    │
+             +-------------+
+             |    Nginx    |
+             +-------------+
+                    │
+             least_conn Load Balancer
+          ┌─────────┴─────────┐
+          │                   │
+ +----------------+   +----------------+
+ | WordPress #1   |   | WordPress #2   |
+ +----------------+   +----------------+
+          │                   │
+          └─────────┬─────────┘
+                    │
+            +----------------+
+            |   MariaDB 11   |
+            +----------------+
+                    │
+            +----------------+
+            | Redis Object   |
+            |     Cache      |
+            +----------------+
+
+
 Production-ready Docker-based WordPress stack optimized for a 2GB VPS.
 
 ---
@@ -305,6 +371,18 @@ git push
 
 # Important
 
+## Security Best Practices
+
+- Never commit the `.env` file to Git.
+- Never store production passwords, API keys, or secrets in the repository.
+- Do not commit SSL certificates or Let's Encrypt account data (`certbot/conf/`).
+- Generate SSL certificates separately on each production server.
+- Verify backups before performing a production restore.
+- Keep Docker images and base operating system packages up to date.
+- Review configuration changes before deploying to production.
+- Test all major changes on a staging or test environment before applying them to production.
+
+
 Never commit:
 
 * .env
@@ -326,6 +404,14 @@ Never commit:
 * Disaster Recovery Ready
 * Monitoring Ready
 
+### Repository Verification
+
+- ✅ Fresh clone tested
+- ✅ Docker image builds successfully
+- ✅ Stack starts successfully with Docker Compose
+- ✅ Health checks pass
+- ✅ Load balancing verified
+- ✅ Repository contains no production secrets
 ---
 
 Maintainer

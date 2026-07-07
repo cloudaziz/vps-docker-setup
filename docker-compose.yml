@@ -78,8 +78,8 @@ services:
 
   wordpress:
     build:
-      context: .
-      dockerfile: docker/wordpress/Dockerfile
+      context: ./docker/wordpress
+      dockerfile: Dockerfile
     image: cloudaziz-wordpress
     container_name: wordpress
     restart: unless-stopped
