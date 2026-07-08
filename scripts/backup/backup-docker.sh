@@ -3,18 +3,16 @@
 set -euo pipefail
 
 ########################################
-# CloudAziz Nginx Backup
+# CloudAziz Docker Configuration Backup
 ########################################
 
 PROJECT_DIR="/srv/cloudaziz"
 BACKUP_REPO="/srv/cloudaziz-backup"
 
-NGINX_DIR="$PROJECT_DIR/nginx"
-
-BACKUP_DIR="$BACKUP_REPO/nginx"
+BACKUP_DIR="$BACKUP_REPO/docker"
 LOG_DIR="$BACKUP_REPO/logs"
 
-BACKUP_FILE="$BACKUP_DIR/nginx.tar.gz"
+BACKUP_FILE="$BACKUP_DIR/docker.tar.gz"
 CHECKSUM_FILE="$BACKUP_FILE.sha256"
 LOG_FILE="$LOG_DIR/backup.log"
 
@@ -26,15 +24,23 @@ log() {
 }
 
 log "======================================"
-log "Nginx Backup Started"
+log "Docker Configuration Backup Started"
 log "======================================"
 
 ########################################
-# Check Source Directory
+# Build Backup File List
 ########################################
 
-if [ ! -d "$NGINX_DIR" ]; then
-    log "ERROR: Nginx directory not found."
+FILES=()
+
+[ -d "$PROJECT_DIR/docker" ] && FILES+=("docker")
+[ -f "$PROJECT_DIR/docker-compose.yml" ] && FILES+=("docker-compose.yml")
+[ -f "$PROJECT_DIR/docker-compose.single.yml" ] && FILES+=("docker-compose.single.yml")
+[ -f "$PROJECT_DIR/docker-compose.override.yml" ] && FILES+=("docker-compose.override.yml")
+[ -f "$PROJECT_DIR/.env" ] && FILES+=(".env")
+
+if [ ${#FILES[@]} -eq 0 ]; then
+    log "ERROR: No Docker configuration files found."
     exit 1
 fi
 
@@ -42,11 +48,9 @@ fi
 # Create Backup
 ########################################
 
-tar \
-    --exclude='cache' \
-    -czpf "$BACKUP_FILE" \
+tar -czpf "$BACKUP_FILE" \
     -C "$PROJECT_DIR" \
-    nginx
+    "${FILES[@]}"
 
 ########################################
 # Verify Backup
@@ -71,7 +75,7 @@ sha256sum "$BACKUP_FILE" > "$CHECKSUM_FILE"
 
 SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
 
-log "Nginx backup completed successfully."
+log "Docker configuration backup completed successfully."
 log "File : $BACKUP_FILE"
 log "Size : $SIZE"
 

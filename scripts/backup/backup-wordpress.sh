@@ -2,36 +2,78 @@
 
 set -euo pipefail
 
-PROJECT_DIR="/srv/cloudaziz"
-BACKUP_DIR="$PROJECT_DIR/backups/wordpress"
+########################################
+# CloudAziz WordPress Backup
+########################################
 
-TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+PROJECT_DIR="/srv/cloudaziz"
+BACKUP_REPO="/srv/cloudaziz-backup"
+
+BACKUP_DIR="$BACKUP_REPO/wordpress"
+LOG_DIR="$BACKUP_REPO/logs"
+
+BACKUP_FILE="$BACKUP_DIR/wordpress.tar.gz"
+CHECKSUM_FILE="$BACKUP_FILE.sha256"
+LOG_FILE="$LOG_DIR/backup.log"
+
+WORDPRESS_VOLUME="cloudaziz_wordpress_data"
 
 mkdir -p "$BACKUP_DIR"
+mkdir -p "$LOG_DIR"
 
-echo "======================================"
-echo "Starting WordPress Backup..."
-echo "Time: $TIMESTAMP"
-echo "======================================"
+log() {
+    echo "[$(date '+%F %T')] $1" | tee -a "$LOG_FILE"
+}
+
+log "======================================"
+log "WordPress Backup Started"
+log "======================================"
+
+########################################
+# Check Docker Volume
+########################################
+
+if ! docker volume inspect "$WORDPRESS_VOLUME" >/dev/null 2>&1; then
+    log "ERROR: Docker volume '$WORDPRESS_VOLUME' not found."
+    exit 1
+fi
+
+########################################
+# Create Backup
+########################################
 
 docker run --rm \
-  -v cloudaziz_wordpress_data:/data:ro \
-  -v "$BACKUP_DIR":/backup \
-  alpine \
-  sh -c "tar -czf /backup/${TIMESTAMP}-wordpress.tar.gz -C /data ."
+    -v "${WORDPRESS_VOLUME}:/data:ro" \
+    -v "${BACKUP_DIR}:/backup" \
+    alpine:3.22 \
+    sh -c "tar -czpf /backup/wordpress.tar.gz -C /data ."
 
-echo
-echo "Backup completed."
+########################################
+# Verify Backup
+########################################
 
-ls -lh "$BACKUP_DIR/${TIMESTAMP}-wordpress.tar.gz"
+if [ ! -s "$BACKUP_FILE" ]; then
+    log "ERROR: Backup file is empty."
+    exit 1
+fi
 
-echo
-echo "Removing backups older than 7 days..."
+tar -tzf "$BACKUP_FILE" >/dev/null
 
-find "$BACKUP_DIR" \
-    -name "*.tar.gz" \
-    -mtime +7 \
-    -delete
+########################################
+# Generate SHA256
+########################################
 
-echo
-echo "Done."
+sha256sum "$BACKUP_FILE" > "$CHECKSUM_FILE"
+
+########################################
+# Summary
+########################################
+
+SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+
+log "WordPress backup completed successfully."
+log "File : $BACKUP_FILE"
+log "Size : $SIZE"
+
+log "======================================"
+

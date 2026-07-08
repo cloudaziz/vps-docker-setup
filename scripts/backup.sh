@@ -1,141 +1,137 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
 
-BASE_DIR="/srv/cloudaziz"
-DATE=$(date +%F_%H-%M-%S)
+set -euo pipefail
 
-BACKUP_DIR="$BASE_DIR/backups"
-LOG_DIR="$BACKUP_DIR/logs"
+########################################
+# CloudAziz Backup System
+########################################
 
-mkdir -p "$BACKUP_DIR/database"
-mkdir -p "$BACKUP_DIR/wordpress"
-mkdir -p "$BACKUP_DIR/nginx"
-mkdir -p "$BACKUP_DIR/ssl"
-mkdir -p "$BACKUP_DIR/checksum"
+PROJECT_DIR="/srv/cloudaziz"
+BACKUP_REPO="/srv/cloudaziz-backup"
+
+LOG_DIR="$BACKUP_REPO/logs"
+MANIFEST_DIR="$BACKUP_REPO/manifest"
+
+LOG_FILE="$LOG_DIR/backup.log"
+MANIFEST_FILE="$MANIFEST_DIR/manifest.txt"
+
 mkdir -p "$LOG_DIR"
-
-LOG_FILE="$LOG_DIR/backup-$DATE.log"
+mkdir -p "$MANIFEST_DIR"
 
 log() {
-    echo "[$(date '+%F %T')] $*" | tee -a "$LOG_FILE"
+    echo "[$(date '+%F %T')] $1" | tee -a "$LOG_FILE"
 }
 
-log "========== Backup Started =========="
+run_backup() {
 
-# Check .env exists
-if [[ ! -f "$BASE_DIR/.env" ]]; then
-    log "ERROR: $BASE_DIR/.env not found."
-    exit 1
-fi
+    local script="$1"
+    local name="$2"
 
-# Load environment variables
+    log "--------------------------------------"
+    log "Running ${name} Backup"
+
+    if bash "$script"; then
+        log "${name} Backup Completed"
+    else
+        log "ERROR: ${name} Backup Failed"
+        exit 1
+    fi
+}
+
+########################################
+# Start
+########################################
+
+: > "$LOG_FILE"
+
+log "======================================"
+log "CloudAziz Full Backup Started"
+log "======================================"
+
+run_backup "$PROJECT_DIR/scripts/backup/backup-db.sh" "Database"
+
+run_backup "$PROJECT_DIR/scripts/backup/backup-wordpress.sh" "WordPress"
+
+run_backup "$PROJECT_DIR/scripts/backup/backup-nginx.sh" "Nginx"
+
+run_backup "$PROJECT_DIR/scripts/backup/backup-ssl.sh" "SSL"
+
+run_backup "$PROJECT_DIR/scripts/backup/backup-docker.sh" "Docker"
+
+########################################
+# Collect System Information
+########################################
+
 set -a
-source "$BASE_DIR/.env"
+source "$PROJECT_DIR/.env"
 set +a
 
-# Database Backup
-DB_BACKUP="$BACKUP_DIR/database/database-$DATE.sql.gz"
+DOMAIN="${DOMAIN:-Unknown}"
 
-log "Starting MariaDB backup..."
+PHP_VERSION=$(docker exec wordpress php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "Unknown")
 
-if docker exec \
-    -e MYSQL_PWD="$MYSQL_PASSWORD" \
-    mariadb \
-    mariadb-dump \
-        -u"$MYSQL_USER" \
-        "$MYSQL_DATABASE" \
-    | gzip > "$DB_BACKUP"; then
+MARIADB_VERSION=$(docker exec mariadb mariadb --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo "Unknown")
 
-    log "Database backup completed."
+WORDPRESS_VERSION=$(docker exec wordpress php -r 'include "/var/www/html/wp-includes/version.php"; echo $wp_version;' 2>/dev/null || echo "Unknown")
+
+if docker exec redis redis-cli ping >/dev/null 2>&1; then
+    REDIS_STATUS="Enabled"
 else
-    log "ERROR: Database backup failed."
-    exit 1
+    REDIS_STATUS="Disabled"
 fi
 
-# WordPress Backup
-WP_BACKUP="$BACKUP_DIR/wordpress/wordpress-$DATE.tar.gz"
+DOCKER_COMPOSE_VERSION=$(docker compose version --short 2>/dev/null || echo "Unknown")
 
-log "Starting WordPress backup..."
+WORDPRESS_NODES=$(docker ps --format '{{.Names}}' | grep -E '^wordpress(-[0-9]+)?$' | wc -l)
 
-if tar -czf "$WP_BACKUP" \
-    -C /var/lib/docker/volumes/cloudaziz_wordpress_data/_data .; then
+NGINX_VERSION=$(docker exec nginx nginx -v 2>&1 | cut -d/ -f2 || echo "Unknown")
 
-    log "WordPress backup completed."
-else
-    log "ERROR: WordPress backup failed."
-    exit 1
-fi
+########################################
+# Generate Manifest
+########################################
 
-# Nginx Configuration Backup
-NGINX_BACKUP="$BACKUP_DIR/nginx/nginx-$DATE.tar.gz"
+cat > "$MANIFEST_FILE" <<EOF
+========================================
+CloudAziz Backup Manifest
+========================================
 
-log "Starting Nginx configuration backup..."
+Backup Time     : $(date '+%F %T')
+Domain          : ${DOMAIN}
 
-if tar -czf "$NGINX_BACKUP" \
-    -C "$BASE_DIR" nginx; then
+PHP             : ${PHP_VERSION}
+MariaDB         : ${MARIADB_VERSION}
+WordPress       : ${WORDPRESS_VERSION}
+Redis           : ${REDIS_STATUS}
+Nginx           : ${NGINX_VERSION}
+Compose         : ${DOCKER_COMPOSE_VERSION}
 
-    log "Nginx configuration backup completed."
-else
-    log "ERROR: Nginx configuration backup failed."
-    exit 1
-fi
+WordPress Nodes : ${WORDPRESS_NODES}
 
-# SSL Certificate Backup
-SSL_BACKUP="$BACKUP_DIR/ssl/ssl-$DATE.tar.gz"
+Infrastructure  : Docker
+Backup Type     : Full
 
-log "Starting SSL certificate backup..."
+----------------------------------------
 
-if tar -czf "$SSL_BACKUP" \
-    -C "$BASE_DIR" certbot/conf; then
+Database        : database/database.sql.gz
+WordPress       : wordpress/wordpress.tar.gz
+Nginx           : nginx/nginx.tar.gz
+SSL             : ssl/ssl.tar.gz
+Docker          : docker/docker.tar.gz
 
-    log "SSL certificate backup completed."
-else
-    log "ERROR: SSL certificate backup failed."
-    exit 1
-fi
+----------------------------------------
 
-# Docker Compose Backup
-COMPOSE_BACKUP="$BACKUP_DIR/docker-compose-$DATE.tar.gz"
+Status      : VERIFIED
 
-log "Starting Docker Compose backup..."
+========================================
+EOF
 
-if tar -czf "$COMPOSE_BACKUP" \
-    -C "$BASE_DIR" \
-    docker-compose.yml \
-    docker-compose.single.yml \
-    docker/wordpress; then
+log "Manifest generated."
 
-    log "Docker Compose backup completed."
-else
-    log "ERROR: Docker Compose backup failed."
-    exit 1
-fi
+########################################
+# Finish
+########################################
 
-# Generate checksums
-CHECKSUM_FILE="$BACKUP_DIR/checksum/checksum-$DATE.sha256"
+log "======================================"
+log "CloudAziz Backup Finished Successfully"
+log "======================================"
 
-log "Generating SHA256 checksums..."
-
-sha256sum \
-    "$DB_BACKUP" \
-    "$WP_BACKUP" \
-    "$NGINX_BACKUP" \
-    "$SSL_BACKUP" \
-    "$COMPOSE_BACKUP" \
-    > "$CHECKSUM_FILE"
-
-log "Checksums generated."
-
-
-# Remove backups older than 30 days
-log "Removing backups older than 30 days..."
-
-find "$BACKUP_DIR/database"   -type f -mtime +30 -delete
-find "$BACKUP_DIR/wordpress"  -type f -mtime +30 -delete
-find "$BACKUP_DIR/nginx"      -type f -mtime +30 -delete
-find "$BACKUP_DIR/ssl"        -type f -mtime +30 -delete
-find "$BACKUP_DIR/checksum"   -type f -mtime +30 -delete
-
-log "Retention policy completed."
-
-log "========== Backup Completed Successfully =========="
