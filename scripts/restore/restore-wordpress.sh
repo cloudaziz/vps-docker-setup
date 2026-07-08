@@ -1,136 +1,50 @@
 #!/usr/bin/env bash
 
-set -Eeuo pipefail
+set -euo pipefail
+
+########################################
+# CloudAziz WordPress Restore
+########################################
 
 PROJECT_DIR="/srv/cloudaziz"
+BACKUP_REPO="/srv/cloudaziz-backup"
 
-BACKUP_DIR="$PROJECT_DIR/backups/wordpress"
+BACKUP_FILE="$BACKUP_REPO/wordpress/wordpress.tar.gz"
 
-VOLUME_NAME="cloudaziz_wordpress_data"
+LOG_DIR="$BACKUP_REPO/logs"
+LOG_FILE="$LOG_DIR/restore.log"
 
-if [ $# -ne 1 ]; then
+mkdir -p "$LOG_DIR"
 
-echo "Usage:"
+log() {
+    echo "[$(date '+%F %T')] $1" | tee -a "$LOG_FILE"
+}
 
-echo " ./scripts/restore/restore-wordpress.sh <backup.tar.gz>"
-
-exit 1
-
-fi
-
-BACKUP_FILE="$1"
+log "======================================"
+log "WordPress Restore Started"
+log "======================================"
 
 if [ ! -f "$BACKUP_FILE" ]; then
-
-echo "ERROR: Backup file not found:"
-
-echo "$BACKUP_FILE"
-
-exit 1
-
+    log "ERROR: Backup file not found."
+    log "File : $BACKUP_FILE"
+    exit 1
 fi
 
-TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-
-EMERGENCY_BACKUP="$BACKUP_DIR/${TIMESTAMP}-before-restore.tar.gz"
-
-echo "========================================="
-
-echo " Emergency WordPress Backup"
-
-echo "========================================="
+docker volume inspect cloudaziz_wordpress_data >/dev/null 2>&1 || {
+    log "ERROR: Docker volume 'cloudaziz_wordpress_data' not found."
+    exit 1
+}
 
 docker run --rm \
+    -v cloudaziz_wordpress_data:/data \
+    -v "$BACKUP_REPO/wordpress":/backup:ro \
+    alpine \
+    sh -c "rm -rf /data/* && tar -xzf /backup/wordpress.tar.gz -C /data"
 
--v ${VOLUME_NAME}:/data:ro \
+log "WordPress restored successfully."
 
--v "$BACKUP_DIR":/backup \
+log "Volume : cloudaziz_wordpress_data"
 
-alpine \
-
-sh -c "tar -czf /backup/$(basename "$EMERGENCY_BACKUP") -C /data ."
-
-echo
-
-echo "Emergency backup saved:"
-
-echo "$EMERGENCY_BACKUP"
-
-echo
-
-echo "========================================="
-
-echo " WordPress Restore"
-
-echo "========================================="
-
-AUTO_CONFIRM=false
-
-if [[ "${2:-}" == "--yes" ]] || [[ "${1:-}" == "--yes" ]]; then
-    AUTO_CONFIRM=true
-fi
-
-if [ "$AUTO_CONFIRM" = false ]; then
-    read -rp "Type YES to continue: " CONFIRM
-
-    if [ "$CONFIRM" != "YES" ]; then
-        echo "Restore cancelled."
-        exit 0
-    fi
-else
-    echo "Auto confirmation enabled."
-fi
-
-echo
-
-echo "Stopping WordPress containers..."
-
-docker stop wordpress wordpress-2
-
-echo
-
-echo "Clearing existing WordPress data..."
-
-docker run --rm \
-
--v ${VOLUME_NAME}:/data \
-
-alpine \
-
-sh -c "rm -rf /data/* /data/.[!.]* /data/..?* 2>/dev/null || true"
-
-echo
-
-echo "Restoring backup..."
-
-docker run --rm \
-
--v ${VOLUME_NAME}:/data \
-
--v "$(dirname "$BACKUP_FILE")":/restore \
-
-alpine \
-
-sh -c "tar -xzf /restore/$(basename "$BACKUP_FILE") -C /data"
-
-echo
-
-echo "Starting WordPress containers..."
-
-docker start wordpress wordpress-2
-
-echo
-
-echo "Verifying restore..."
-
-docker run --rm \
-
--v ${VOLUME_NAME}:/data:ro \
-
-alpine \
-
-sh -c "ls -lah /data | head"
-
-echo
-
-echo "WordPress restore completed successfully."
+log "======================================"
+log "WordPress Restore Completed"
+log "======================================"

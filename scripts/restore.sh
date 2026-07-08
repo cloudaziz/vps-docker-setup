@@ -1,148 +1,104 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
 
-LOCK_FILE="/tmp/cloudaziz-restore.lock"
+set -euo pipefail
 
-exec 9>"$LOCK_FILE"
+########################################
+# CloudAziz Restore System
+########################################
 
-if ! flock -n 9; then
-    echo "Another restore process is already running."
-    exit 1
-fi
+PROJECT_DIR="/srv/cloudaziz"
+BACKUP_REPO="/srv/cloudaziz-backup"
 
-trap 'rm -f "$LOCK_FILE"' EXIT
-touch "$LOCK_FILE"
+LOG_DIR="$BACKUP_REPO/logs"
+LOG_FILE="$LOG_DIR/restore.log"
 
-BASE_DIR="/srv/cloudaziz"
-BACKUP_DIR="$BASE_DIR/backups"
-LOG_DIR="$BACKUP_DIR/logs"
-
-DATE=$(date +%F_%H-%M-%S)
-LOG_FILE="$LOG_DIR/restore-$DATE.log"
+mkdir -p "$LOG_DIR"
 
 log() {
-    echo "[$(date '+%F %T')] $*" | tee -a "$LOG_FILE"
+    echo "[$(date '+%F %T')] $1" | tee -a "$LOG_FILE"
 }
 
-trap 'log "ERROR: Restore failed on line $LINENO"; exit 1' ERR
+run_restore() {
 
-log "========== Restore Started =========="
+    local script="$1"
+    local name="$2"
 
-# -------------------------
-# Load environment
-# -------------------------
-if [[ ! -f "$BASE_DIR/.env" ]]; then
-    log "ERROR: .env file not found"
-    exit 1
-fi
+    log "--------------------------------------"
+    log "Running ${name} Restore"
 
-set -a
-source "$BASE_DIR/.env"
-set +a
+    if bash "$script"; then
+        log "${name} Restore Completed"
+    else
+        log "ERROR: ${name} Restore Failed"
+        exit 1
+    fi
+}
 
-# -------------------------
-# Locate latest backups
-# -------------------------
-DB_BACKUP=$(ls -t "$BACKUP_DIR"/database/database-*.sql.gz | head -1)
-WP_BACKUP=$(ls -t "$BACKUP_DIR"/wordpress/wordpress-*.tar.gz | head -1)
-NGINX_BACKUP=$(ls -t "$BACKUP_DIR"/nginx/nginx-*.tar.gz | head -1)
-SSL_BACKUP=$(ls -t "$BACKUP_DIR"/ssl/ssl-*.tar.gz | head -1)
-COMPOSE_BACKUP=$(ls -t "$BACKUP_DIR"/docker-compose-*.tar.gz | head -1)
+########################################
+# Confirmation
+########################################
 
-log "Latest backup files detected."
-log "Database : $DB_BACKUP"
-log "WordPress: $WP_BACKUP"
-log "Nginx    : $NGINX_BACKUP"
-log "SSL      : $SSL_BACKUP"
-log "Compose  : $COMPOSE_BACKUP"
-
-# -------------------------
-# Safety confirmation
-# -------------------------
 echo
-echo "=========================================="
-echo " WARNING: Production Restore"
-echo "=========================================="
+echo "========================================"
+echo "WARNING!"
+echo "========================================"
 echo
-echo "This operation will overwrite:"
-echo " - Database"
-echo " - WordPress files"
-echo " - Nginx configuration"
-echo " - SSL certificates"
+echo "This operation will overwrite existing data."
 echo
-read -rp "Type YES to continue: " CONFIRM
+echo "Type 'yes' to continue."
+echo
 
-if [[ "${CONFIRM^^}" != "YES" ]]; then
-    log "Restore cancelled by user."
+read -r CONFIRM
+
+if [ "$CONFIRM" != "yes" ]; then
+    echo
+    echo "Restore cancelled."
     exit 0
 fi
 
-log "User confirmed restore."
+########################################
+# Start
+########################################
 
-# -------------------------
-# Database Restore
-# -------------------------
-log "Starting database restore..."
+: > "$LOG_FILE"
 
-PRE_RESTORE_BACKUP="$BACKUP_DIR/database/pre-restore-$DATE.sql.gz"
+log "======================================"
+log "CloudAziz Restore Started"
+log "======================================"
 
-log "Creating emergency backup before restore..."
+run_restore "$PROJECT_DIR/scripts/restore/restore-docker.sh" "Docker"
 
-docker exec mariadb mariadb-dump \
-    -u"$MYSQL_USER" \
-    -p"$MYSQL_PASSWORD" \
-    "$MYSQL_DATABASE" | gzip > "$PRE_RESTORE_BACKUP"
+run_restore "$PROJECT_DIR/scripts/restore/restore-ssl.sh" "SSL"
 
-log "Emergency backup created: $PRE_RESTORE_BACKUP"
+run_restore "$PROJECT_DIR/scripts/restore/restore-nginx.sh" "Nginx"
 
-log "Restoring database..."
+run_restore "$PROJECT_DIR/scripts/restore/restore-wordpress.sh" "WordPress"
 
-gunzip -c "$DB_BACKUP" | docker exec -i mariadb mariadb \
-    -u"$MYSQL_USER" \
-    -p"$MYSQL_PASSWORD" \
-    "$MYSQL_DATABASE"
+run_restore "$PROJECT_DIR/scripts/restore/restore-db.sh" "Database"
 
-log "Database restore completed."
+########################################
+# Restart Containers
+########################################
 
-# ------------------------
-#
-# ------------------------
+log "--------------------------------------"
+log "Restarting Docker Containers"
 
-log "Stopping WordPress containers..."
+cd "$PROJECT_DIR"
 
-docker stop wordpress wordpress-2 || true
+docker compose down
+docker compose up -d
 
-log "Restoring WordPress files..."
+log "Docker Containers Restarted"
 
-WP_VOLUME="/var/lib/docker/volumes/cloudaziz_wordpress_data/_data"
+########################################
+# Finish
+########################################
 
-rm -rf "$WP_VOLUME"/*
+log "======================================"
+log "CloudAziz Restore Finished Successfully"
+log "======================================"
 
-tar -xzf "$WP_BACKUP" -C "$WP_VOLUME"
-
-log "WordPress restore completed."
-
-log "Starting WordPress containers..."
-
-docker start wordpress wordpress-2 || true
-
-log "Waiting for WordPress to initialize..."
-sleep 8
-
-log "Reloading Nginx..."
-
-docker exec nginx nginx -s reload || true
-# -------------------------
-# Final Health Check
-# -------------------------
-log "Running health check..."
-
-sleep 3
-
-if curl -fsS https://cloudaziz.com > /dev/null; then
-    log "Website is UP"
-else
-    log "WARNING: Website health check failed"
-fi
-
-log "========== RESTORE COMPLETED SUCCESSFULLY =========="
+echo
+echo "========================================"
+echo "Restore Completed Successfully."
+echo "========================================"

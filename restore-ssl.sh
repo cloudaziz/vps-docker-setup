@@ -3,17 +3,13 @@
 set -euo pipefail
 
 ########################################
-# CloudAziz Database Restore
+# CloudAziz SSL Restore
 ########################################
 
 PROJECT_DIR="/srv/cloudaziz"
 BACKUP_REPO="/srv/cloudaziz-backup"
 
-set -a
-source "$PROJECT_DIR/.env"
-set +a
-
-BACKUP_FILE="$BACKUP_REPO/database/database.sql.gz"
+BACKUP_FILE="$BACKUP_REPO/ssl/ssl.tar.gz"
 
 LOG_DIR="$BACKUP_REPO/logs"
 LOG_FILE="$LOG_DIR/restore.log"
@@ -25,7 +21,7 @@ log() {
 }
 
 log "======================================"
-log "Database Restore Started"
+log "SSL Restore Started"
 log "======================================"
 
 if [ ! -f "$BACKUP_FILE" ]; then
@@ -34,22 +30,12 @@ if [ ! -f "$BACKUP_FILE" ]; then
     exit 1
 fi
 
-if ! docker ps --format '{{.Names}}' | grep -q '^mariadb$'; then
-    log "ERROR: MariaDB container is not running."
-    exit 1
-fi
+tar -xzf "$BACKUP_FILE" -C "$PROJECT_DIR"
 
-log "Restoring database..."
+log "SSL restored successfully."
 
-gunzip -c "$BACKUP_FILE" | docker exec -i mariadb mariadb \
-    -u"${MYSQL_USER}" \
-    -p"${MYSQL_PASSWORD}" \
-    "${MYSQL_DATABASE}"
-
-log "Database restored successfully."
-
-log "Database : ${MYSQL_DATABASE}"
+log "Destination : $PROJECT_DIR/certbot"
 
 log "======================================"
-log "Database Restore Completed"
+log "SSL Restore Completed"
 log "======================================"
