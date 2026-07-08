@@ -43,8 +43,8 @@ fi
 ########################################
 
 tar -czpf "$BACKUP_FILE" \
-    -C "$PROJECT_DIR/certbot" \
-    conf
+    -C "$PROJECT_DIR" \
+    certbot
 
 ########################################
 # Verify Backup
