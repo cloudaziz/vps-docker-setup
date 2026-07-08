@@ -9,6 +9,12 @@ set -euo pipefail
 PROJECT_DIR="/srv/cloudaziz"
 BACKUP_REPO="/srv/cloudaziz-backup"
 
+########################################
+# Load Libraries
+########################################
+
+source "$PROJECT_DIR/scripts/lib/checksum.sh"
+
 LOG_DIR="$BACKUP_REPO/logs"
 LOG_FILE="$LOG_DIR/restore.log"
 
@@ -65,6 +71,22 @@ fi
 log "======================================"
 log "CloudAziz Restore Started"
 log "======================================"
+
+########################################
+# Verify Backup Integrity
+########################################
+
+log "======================================"
+log "Verifying Backup Integrity"
+log "======================================"
+
+verify_checksum "$BACKUP_REPO/database/database.sql.gz"
+verify_checksum "$BACKUP_REPO/wordpress/wordpress.tar.gz"
+verify_checksum "$BACKUP_REPO/nginx/nginx.tar.gz"
+verify_checksum "$BACKUP_REPO/ssl/ssl.tar.gz"
+verify_checksum "$BACKUP_REPO/docker/docker.tar.gz"
+
+log "All backup files verified successfully."
 
 run_restore "$PROJECT_DIR/scripts/restore/restore-docker.sh" "Docker"
 
