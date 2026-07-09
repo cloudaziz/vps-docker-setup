@@ -1,422 +1,415 @@
-# CloudAziz VPS Docker Setup
+# CloudAziz VPS Setup Guide
 
-## Overview
+**Project:** CloudAziz Production Infrastructure
+**Repository:** vps-docker-setup
+**Version:** 1.0
+**Platform:** Ubuntu 24.04 LTS (2GB VPS Optimized)
 
-CloudAziz VPS Docker Setup is a production-ready Docker-based WordPress stack optimized for a **2 GB VPS**.
+---
 
-It provides a reproducible deployment with:
+# 1. Overview
 
-- Nginx (Reverse Proxy)
-- WordPress PHP-FPM 8.3
-- MariaDB 11.8
-- Redis Object Cache
-- phpMyAdmin
-- Let's Encrypt SSL
-- FastCGI Cache
-- Load Balancing (2× WordPress Containers)
-- Backup & Restore Scripts
-- Health Monitoring
+এই গাইড অনুসরণ করে একটি নতুন VPS-এ CloudAziz-এর সম্পূর্ণ Infrastructure প্রস্তুত করা হবে।
 
-The repository is designed so that a fresh clone can be deployed on a new VPS with minimal configuration.
+এই ধাপে কোনো Website Data Restore করা হবে না।
 
-## Quick Start
+Infrastructure প্রস্তুত হওয়ার পর আলাদা Backup Repository ব্যবহার করে Site Restore করা হবে।
+
+---
+
+# 2. Server Requirements
+
+Minimum Requirements
+
+* 2 GB RAM
+* 1 vCPU
+* 40 GB SSD
+* Ubuntu 24.04 LTS
+* Public IPv4
+* Domain Name
+* Cloudflare (Recommended)
+
+---
+
+# 3. Login
+
+SSH দিয়ে Server-এ Login করুন।
 
 ```bash
-git clone git@github.com:cloudaziz/vps-docker-setup.git
+ssh root@SERVER_IP
+```
 
-cd vps-docker-setup
+---
 
+# 4. Update System
+
+```bash
+apt update
+apt upgrade -y
+apt autoremove -y
+```
+
+---
+
+# 5. Install Required Packages
+
+```bash
+apt install -y \
+git \
+curl \
+wget \
+nano \
+tree \
+ca-certificates \
+gnupg \
+lsb-release
+```
+
+---
+
+# 6. Install Docker
+
+Docker Official Repository ব্যবহার করে Docker Engine Install করুন।
+
+যাচাই করুন:
+
+```bash
+docker --version
+```
+
+---
+
+# 7. Install Docker Compose
+
+যাচাই করুন:
+
+```bash
+docker compose version
+```
+
+---
+
+# 8. Clone Repository
+
+```bash
+cd /srv
+
+git clone git@github.com:cloudaziz/vps-docker-setup.git cloudaziz
+
+cd cloudaziz
+```
+
+---
+
+# 9. Repository Structure
+
+```text
+/srv/cloudaziz
+
+docker/
+nginx/
+certbot/
+scripts/
+.env.example
+docker-compose.yml
+Dockerfile
+php.ini
+healthcheck.sh
+README.md
+```
+
+---
+
+# 10. Configure Environment
+
+`.env.example` কপি করুন।
+
+```bash
 cp .env.example .env
+```
 
-nano .env
+`.env` ফাইল সম্পাদনা করুন।
 
+উদাহরণ:
+
+```env
+DOMAIN=cloudaziz.com
+
+MYSQL_DATABASE=wordpress
+MYSQL_USER=wordpress
+MYSQL_PASSWORD=********
+MYSQL_ROOT_PASSWORD=********
+
+TZ=Asia/Dhaka
+```
+
+---
+
+# 11. Verify Docker Compose
+
+```bash
+docker compose config
+```
+
+কোনো Error থাকা যাবে না।
+
+---
+
+# 12. Build Images
+
+```bash
 docker compose build
-
-docker compose up -d
-```
-
-After the stack is running, obtain an SSL certificate using Certbot and reload Nginx.
-
-## Architecture
-
-                Internet
-                    │
-              HTTPS :443
-                    │
-             +-------------+
-             |    Nginx    |
-             +-------------+
-                    │
-             least_conn Load Balancer
-          ┌─────────┴─────────┐
-          │                   │
- +----------------+   +----------------+
- | WordPress #1   |   | WordPress #2   |
- +----------------+   +----------------+
-          │                   │
-          └─────────┬─────────┘
-                    │
-            +----------------+
-            |   MariaDB 11   |
-            +----------------+
-                    │
-            +----------------+
-            | Redis Object   |
-            |     Cache      |
-            +----------------+
-
-
-Production-ready Docker-based WordPress stack optimized for a 2GB VPS.
-
----
-
-## Features
-
-* Docker Compose
-* Nginx (Alpine)
-* WordPress PHP-FPM 8.3
-* MariaDB 11.8
-* Redis Object Cache
-* FastCGI Cache
-* Load Balancing (2× WordPress PHP-FPM)
-* Let's Encrypt SSL
-* WP-CLI Integration
-* Backup System
-* Disaster Recovery
-* Health Monitoring
-
----
-
-# Server Specification
-
-| Item       | Value            |
-| ---------- | ---------------- |
-| OS         | Ubuntu 24.04 LTS |
-| RAM        | 2 GB             |
-| CPU        | 1 vCPU           |
-| Web Server | Nginx            |
-| PHP        | 8.3              |
-| Database   | MariaDB 11.8     |
-| Cache      | Redis 8          |
-| SSL        | Let's Encrypt    |
-| Container  | Docker Compose   |
-
----
-
-# Project Structure
-
-```
-.
-├── backups/
-│   ├── database/
-│   ├── wordpress/
-│   ├── nginx/
-│   ├── ssl/
-│   └── logs/
-│
-├── certbot/
-│
-├── docker/
-│   └── wordpress/
-│
-├── nginx/
-│   ├── conf.d/
-│   ├── cache/
-│   └── nginx.conf
-│
-├── scripts/
-│   ├── backup/
-│   ├── restore/
-│   ├── monitor/
-│   └── wp.sh
-│
-├── docker-compose.yml
-├── .env
-└── README.md
 ```
 
 ---
 
-# Docker Services
+# 13. Start Infrastructure
 
-| Service     | Purpose             |
-| ----------- | ------------------- |
-| nginx       | Reverse Proxy       |
-| wordpress   | PHP-FPM Instance #1 |
-| wordpress-2 | PHP-FPM Instance #2 |
-| mariadb     | Database            |
-| redis       | Object Cache        |
-
----
-
-# Start Stack
-
-```
+```bash
 docker compose up -d
 ```
 
 ---
 
-# Stop Stack
+# 14. Verify Containers
 
-```
-docker compose down
-```
-
----
-
-# Restart
-
-```
-docker compose restart
-```
-
----
-
-# Service Status
-
-```
+```bash
 docker compose ps
 ```
 
----
+Expected Services
 
-# Logs
+* nginx
+* mariadb
+* redis
+* wordpress
+* wordpress-2
+* phpmyadmin
 
-```
-docker compose logs -f
-```
-
-Specific service:
-
-```
-docker compose logs -f nginx
-```
+সব Container Running এবং Healthy থাকতে হবে।
 
 ---
 
-# WP-CLI
+# 15. Verify Redis
 
-List plugins
-
-```
-./scripts/wp.sh plugin list
-```
-
-Core version
-
-```
-./scripts/wp.sh core version
-```
-
-Flush cache
-
-```
-./scripts/wp.sh cache flush
-```
-
----
-
-# Backup
-
-Database
-
-```
-./scripts/backup/backup-db.sh
-```
-
-WordPress
-
-```
-./scripts/backup/backup-wordpress.sh
-```
-
-Nginx
-
-```
-./scripts/backup/backup-nginx.sh
-```
-
-SSL
-
-```
-./scripts/backup/backup-ssl.sh
-```
-
----
-
-# Restore
-
-Database
-
-```
-./scripts/restore/restore-db.sh backups/database/file.sql.gz
-```
-
-WordPress
-
-```
-./scripts/restore/restore-wordpress.sh backups/wordpress/file.tar.gz
-```
-
-Nginx
-
-```
-./scripts/restore/restore-nginx.sh backups/nginx/file.tar.gz
-```
-
-SSL
-
-```
-./scripts/restore/restore-ssl.sh backups/ssl/file.tar.gz
-```
-
-Complete Disaster Recovery
-
-```
-./scripts/restore/restore-all.sh
-```
-
----
-
-# Monitoring
-
-Run health check
-
-```
-./scripts/monitor/health-check.sh
-```
-
----
-
-# Health Checklist
-
-* Nginx
-* WordPress
-* WordPress-2
-* MariaDB
-* Redis
-* Website HTTP Status
-* Disk Usage
-* Memory Usage
-* Docker Stats
-
----
-
-# FastCGI Cache Test
-
-```
-curl -I https://cloudaziz.com
-```
-
-Expected
-
-```
-x-fastcgi-cache: HIT
-```
-
----
-
-# Redis Test
-
-```
+```bash
 docker exec redis redis-cli ping
 ```
 
-Expected
+Expected Output
 
-```
+```text
 PONG
 ```
 
 ---
 
-# Nginx Configuration Test
+# 16. Verify MariaDB
 
+```bash
+docker exec mariadb mariadb -u root -p
 ```
+
+---
+
+# 17. Verify Nginx
+
+```bash
 docker exec nginx nginx -t
 ```
 
-Expected
+Expected Output
 
-```
+```text
 syntax is ok
 test is successful
 ```
 
 ---
 
-# Git Workflow
+# 18. Verify WordPress Containers
 
-Check status
-
-```
-git status
+```bash
+docker compose ps
 ```
 
-Commit
+WordPress এবং WordPress-2 Healthy থাকতে হবে।
 
-```
-git add .
-git commit -m "Description"
+---
+
+# 19. Verify Logs
+
+```bash
+docker compose logs
 ```
 
-Push
+কোনো Fatal Error থাকা যাবে না।
 
-```
-git push
+---
+
+# 20. Infrastructure Status
+
+এই পর্যায়ে—
+
+✓ Docker Installed
+
+✓ Docker Compose Installed
+
+✓ Images Built
+
+✓ Containers Running
+
+✓ Redis Running
+
+✓ MariaDB Running
+
+✓ WordPress Running
+
+✓ Nginx Running
+
+Infrastructure Ready.
+
+এখনও Website Restore করা হয়নি।
+
+---
+
+# 21. Next Step
+
+Infrastructure প্রস্তুত হওয়ার পরে Backup Repository Clone করুন।
+
+```bash
+cd /srv
+
+git clone git@github.com:cloudaziz/cloudaziz-docker-backup.git cloudaziz-backup
 ```
 
 ---
 
-# Important
+# 22. Restore Production Website
 
-## Security Best Practices
+Infrastructure Repository থেকে নয়।
 
-- Never commit the `.env` file to Git.
-- Never store production passwords, API keys, or secrets in the repository.
-- Do not commit SSL certificates or Let's Encrypt account data (`certbot/conf/`).
-- Generate SSL certificates separately on each production server.
-- Verify backups before performing a production restore.
-- Keep Docker images and base operating system packages up to date.
-- Review configuration changes before deploying to production.
-- Test all major changes on a staging or test environment before applying them to production.
+Backup Repository ব্যবহার করে Restore করুন।
 
+```bash
+cd /srv/cloudaziz/scripts
 
-Never commit:
+./restore.sh
+```
 
-* .env
-* backups/
-* SSL certificates
-* cache
-* logs
+Restore Process স্বয়ংক্রিয়ভাবে করবে:
+
+* SHA256 Verification
+* Docker Restore
+* SSL Restore
+* Nginx Restore
+* WordPress Restore
+* Database Restore
+* Container Restart
 
 ---
 
-# Production Status
+# 23. Validation
 
-* Dockerized
-* SSL Enabled
-* Redis Enabled
-* FastCGI Cache Enabled
-* Load Balanced
-* Backup Ready
-* Disaster Recovery Ready
-* Monitoring Ready
+Restore শেষ হলে পরীক্ষা করুন:
 
-### Repository Verification
+```bash
+docker compose ps
+```
 
-- ✅ Fresh clone tested
-- ✅ Docker image builds successfully
-- ✅ Stack starts successfully with Docker Compose
-- ✅ Health checks pass
-- ✅ Load balancing verified
-- ✅ Repository contains no production secrets
+```bash
+docker exec redis redis-cli ping
+```
+
+```bash
+docker exec nginx nginx -t
+```
+
+```bash
+curl -I https://cloudaziz.com
+```
+
+Expected:
+
+* HTTP/2 200
+* SSL Working
+* All Containers Healthy
+
 ---
 
-Maintainer
+# 24. Final Checklist
 
-**Md Abdul Aziz**
+✓ Ubuntu Updated
 
-CloudAziz
+✓ Docker Installed
 
+✓ Docker Compose Installed
+
+✓ Repository Cloned
+
+✓ .env Configured
+
+✓ Images Built
+
+✓ Containers Running
+
+✓ Restore Completed
+
+✓ Website Online
+
+✓ SSL Working
+
+✓ Redis Connected
+
+✓ Database Connected
+
+✓ Load Balancer Working
+
+✓ Health Checks Passed
+
+---
+
+# 25. Workflow Summary
+
+```text
+New VPS
+    │
+    ▼
+Update Ubuntu
+    │
+    ▼
+Install Docker
+    │
+    ▼
+Install Docker Compose
+    │
+    ▼
+Clone vps-docker-setup
+    │
+    ▼
+Configure .env
+    │
+    ▼
+docker compose build
+    │
+    ▼
+docker compose up -d
+    │
+    ▼
+Infrastructure Ready
+    │
+    ▼
+Clone cloudaziz-docker-backup
+    │
+    ▼
+Run restore.sh
+    │
+    ▼
+Production Website Online
+```
+
+---
+
+**Document Status:** Production Ready
+**Repository:** vps-docker-setup
+**Last Updated:** July 2026
