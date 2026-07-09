@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ########################################
-# CloudAziz SSL Enable Script
+# CloudAziz SSL Enable
 ########################################
 
 PROJECT_DIR="/srv/cloudaziz"
@@ -29,7 +29,7 @@ log "CloudAziz SSL Enable Started"
 log "======================================"
 
 ########################################
-# Check SSL Certificate
+# Verify SSL Certificate
 ########################################
 
 if [ ! -f "$FULLCHAIN" ]; then
@@ -44,19 +44,19 @@ if [ ! -f "$PRIVKEY" ]; then
     exit 1
 fi
 
-log "SSL certificate found."
+log "SSL certificate verified."
 
 ########################################
-# Check Production Config
+# Verify Production Config
 ########################################
 
 if [ ! -f "$PRODUCTION_DIR/default.conf" ]; then
-    log "ERROR: production/default.conf not found."
+    log "ERROR: $PRODUCTION_DIR/default.conf not found."
     exit 1
 fi
 
 if [ ! -f "$PRODUCTION_DIR/ssl.conf" ]; then
-    log "ERROR: production/ssl.conf not found."
+    log "ERROR: $PRODUCTION_DIR/ssl.conf not found."
     exit 1
 fi
 
@@ -64,14 +64,16 @@ fi
 # Enable Production Config
 ########################################
 
-cp "$PRODUCTION_DIR/default.conf" "$NGINX_CONF_DIR/default.conf"
+cp -f "$PRODUCTION_DIR/default.conf" \
+      "$NGINX_CONF_DIR/default.conf"
 
-cp "$PRODUCTION_DIR/ssl.conf" "$NGINX_CONF_DIR/ssl.conf"
+cp -f "$PRODUCTION_DIR/ssl.conf" \
+      "$NGINX_CONF_DIR/ssl.conf"
 
-log "Production configuration activated."
+log "Production nginx configuration enabled."
 
 ########################################
-# Test nginx
+# Test Nginx Configuration
 ########################################
 
 docker compose exec nginx nginx -t
@@ -79,17 +81,29 @@ docker compose exec nginx nginx -t
 log "Nginx configuration test passed."
 
 ########################################
-# Reload nginx
+# Reload Nginx
 ########################################
 
 docker compose exec nginx nginx -s reload
 
-log "Nginx reloaded."
+log "Nginx reloaded successfully."
 
 ########################################
-# Finished
+# Verify HTTPS
+########################################
+
+sleep 2
+
+if curl -skI https://cloudaziz.com >/dev/null; then
+    log "HTTPS verification successful."
+else
+    log "WARNING: HTTPS verification failed."
+fi
+
+########################################
+# Finish
 ########################################
 
 log "======================================"
-log "HTTPS is now enabled."
+log "CloudAziz SSL Enabled Successfully"
 log "======================================"
